@@ -7,6 +7,17 @@
 
 Python library for [Inky pHAT](https://shop.pimoroni.com/products/inky-phat), [Inky wHAT](https://shop.pimoroni.com/products/inky-what) and [Inky Impression](https://shop.pimoroni.com/?q=inky+impression) e-paper displays for Raspberry Pi.
 
+## Modern C++ driver (experimental)
+
+An early C++20 port of the Inky driver focused on the E673 (Inky Impression 7.3" / Spectra 6) lives in the `include/` and `src/` folders. You can build a static library with CMake:
+
+```bash
+cmake -S . -B build
+cmake --build build
+```
+
+Enable `-DINKY_ENABLE_LIBGPIOD=ON` if you have `libgpiod` and wish to talk to real hardware through GPIO and spidev.
+
 - [Get Inky](#get-inky)
 - [Installation](#installation)
   - [Full install (recommended)](#full-install-recommended)
