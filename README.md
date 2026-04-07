@@ -11,6 +11,13 @@ Modern C++20 port of the Inky driver focused on the E673 Inky Impression 7.3" Sp
 - [Porting Workflow](#porting-workflow)
 - [Troubleshooting](#troubleshooting)
 
+## License
+
+This project is based on software originally developed by Pimoroni Ltd,
+licensed under the MIT License.
+
+See the LICENSE file for details.
+
 ## Overview
 
 This repository contains a CMake-based C++ implementation of the Inky display logic.
