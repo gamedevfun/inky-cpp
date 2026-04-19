@@ -1,7 +1,9 @@
 #include "inky/hardware.hpp"
 
 #include <algorithm>
+#include <chrono>
 #include <cstring>
+#include <thread>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
@@ -18,30 +20,56 @@
 
 namespace inky {
 
-MemoryGpio::MemoryGpio(std::size_t lines) : states_(lines, false) {}
+MemoryGpio::MemoryGpio(std::size_t lines) : states_(lines, false), configs_(lines) {}
 
 void MemoryGpio::configureOutput(unsigned int line, bool initialState) {
     ensureSize(line);
+    configs_[line] = LineConfig{true, false, GpioEdge::None};
     states_[line] = initialState;
 }
 
-void MemoryGpio::configureInput(unsigned int line, bool pullUp) {
+void MemoryGpio::configureInput(unsigned int line, bool pullUp, GpioEdge edge) {
     ensureSize(line);
+    configs_[line] = LineConfig{false, pullUp, edge};
     states_[line] = pullUp;
 }
 
 void MemoryGpio::setValue(unsigned int line, bool active) {
     ensureSize(line);
+    const bool previous = states_[line];
     states_[line] = active;
+    if (!configs_[line].isOutput && configs_[line].edge == GpioEdge::Falling && previous && !active) {
+        edgeEvents_.push_back(line);
+    }
 }
 
 bool MemoryGpio::getValue(unsigned int line) const {
     return line < states_.size() ? states_[line] : false;
 }
 
+std::optional<unsigned int> MemoryGpio::waitForEdge(std::span<const unsigned int> lines, std::chrono::milliseconds timeout) {
+    const auto deadline = std::chrono::steady_clock::now() + timeout;
+
+    while (true) {
+        while (!edgeEvents_.empty()) {
+            const unsigned int eventLine = edgeEvents_.front();
+            edgeEvents_.pop_front();
+            if (std::find(lines.begin(), lines.end(), eventLine) != lines.end()) {
+                return eventLine;
+            }
+        }
+
+        if (std::chrono::steady_clock::now() >= deadline) {
+            return std::nullopt;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+}
+
 void MemoryGpio::ensureSize(unsigned int line) {
     if (line >= states_.size()) {
         states_.resize(line + 1, false);
+        configs_.resize(line + 1);
     }
 }
 
@@ -53,6 +81,18 @@ std::runtime_error systemError(const std::string &context) {
 }
 
 struct LinuxGpio::Impl {
+    enum class RequestMode {
+        Output,
+        Input,
+        FallingEdgeInput,
+    };
+
+    struct LineHandle {
+        gpiod_line *line{nullptr};
+        RequestMode mode{RequestMode::Input};
+        bool pullUp{false};
+    };
+
     explicit Impl(const std::string &chipPath) {
         chip = gpiod_chip_open(chipPath.c_str());
         if (chip == nullptr) {
@@ -62,47 +102,66 @@ struct LinuxGpio::Impl {
 
     ~Impl() {
         for (auto &entry : lines) {
-            gpiod_line_release(entry.second);
+            gpiod_line_release(entry.second.line);
         }
         if (chip != nullptr) {
             gpiod_chip_close(chip);
         }
     }
 
-    void requestLine(unsigned int line, bool output, bool initialState, bool pullUp) {
+    void requestLine(unsigned int line, RequestMode mode, bool initialState, bool pullUp) {
+        auto existing = lines.find(line);
+        if (existing != lines.end() && existing->second.mode == mode && existing->second.pullUp == pullUp) {
+            if (mode == RequestMode::Output && gpiod_line_set_value(existing->second.line, initialState ? 1 : 0) < 0) {
+                throw systemError("gpiod_line_set_value");
+            }
+            return;
+        }
+
+        if (existing != lines.end()) {
+            gpiod_line_release(existing->second.line);
+            lines.erase(existing);
+        }
+
+        int flags = pullUp ? GPIOD_LINE_REQUEST_FLAG_BIAS_PULL_UP : 0;
         gpiod_line *handle = gpiod_chip_get_line(chip, line);
         if (handle == nullptr) {
             throw systemError("gpiod_chip_get_line");
         }
 
-        int flags = pullUp ? GPIOD_LINE_REQUEST_FLAG_BIAS_PULL_UP : 0;
-        int result;
-        if (output) {
-            result = gpiod_line_request_output_flags(handle, "inky", flags, initialState ? 1 : 0);
-        } else {
-            result = gpiod_line_request_input_flags(handle, "inky", flags);
+        int result = -1;
+        switch (mode) {
+            case RequestMode::Output:
+                result = gpiod_line_request_output_flags(handle, "inky", flags, initialState ? 1 : 0);
+                break;
+            case RequestMode::Input:
+                result = gpiod_line_request_input_flags(handle, "inky", flags);
+                break;
+            case RequestMode::FallingEdgeInput:
+                result = gpiod_line_request_falling_edge_events_flags(handle, "inky", flags);
+                break;
         }
-
         if (result < 0) {
             throw systemError("gpiod_line_request");
         }
 
-        lines[line] = handle;
+        lines[line] = LineHandle{handle, mode, pullUp};
     }
 
     gpiod_chip *chip{nullptr};
-    std::unordered_map<unsigned int, gpiod_line *> lines;
+    std::unordered_map<unsigned int, LineHandle> lines;
 };
 
 LinuxGpio::LinuxGpio(const std::string &chipPath) : impl_(std::make_unique<Impl>(chipPath)) {}
 LinuxGpio::~LinuxGpio() = default;
 
 void LinuxGpio::configureOutput(unsigned int line, bool initialState) {
-    impl_->requestLine(line, true, initialState, false);
+    impl_->requestLine(line, Impl::RequestMode::Output, initialState, false);
 }
 
-void LinuxGpio::configureInput(unsigned int line, bool pullUp) {
-    impl_->requestLine(line, false, false, pullUp);
+void LinuxGpio::configureInput(unsigned int line, bool pullUp, GpioEdge edge) {
+    const auto mode = edge == GpioEdge::Falling ? Impl::RequestMode::FallingEdgeInput : Impl::RequestMode::Input;
+    impl_->requestLine(line, mode, false, pullUp);
 }
 
 void LinuxGpio::setValue(unsigned int line, bool active) {
@@ -110,7 +169,7 @@ void LinuxGpio::setValue(unsigned int line, bool active) {
     if (it == impl_->lines.end()) {
         throw std::runtime_error("GPIO line not requested");
     }
-    if (gpiod_line_set_value(it->second, active ? 1 : 0) < 0) {
+    if (gpiod_line_set_value(it->second.line, active ? 1 : 0) < 0) {
         throw systemError("gpiod_line_set_value");
     }
 }
@@ -120,11 +179,44 @@ bool LinuxGpio::getValue(unsigned int line) const {
     if (it == impl_->lines.end()) {
         throw std::runtime_error("GPIO line not requested");
     }
-    int value = gpiod_line_get_value(it->second);
+    int value = gpiod_line_get_value(it->second.line);
     if (value < 0) {
         throw systemError("gpiod_line_get_value");
     }
     return value != 0;
+}
+
+std::optional<unsigned int> LinuxGpio::waitForEdge(std::span<const unsigned int> lines, std::chrono::milliseconds timeout) {
+    const auto deadline = std::chrono::steady_clock::now() + timeout;
+    while (std::chrono::steady_clock::now() < deadline) {
+        for (unsigned int line : lines) {
+            auto it = impl_->lines.find(line);
+            if (it == impl_->lines.end()) {
+                continue;
+            }
+            if (it->second.mode != Impl::RequestMode::FallingEdgeInput) {
+                continue;
+            }
+
+            timespec ts{};
+            ts.tv_sec = 0;
+            ts.tv_nsec = 1'000'000;
+            const int waitResult = gpiod_line_event_wait(it->second.line, &ts);
+            if (waitResult < 0) {
+                throw systemError("gpiod_line_event_wait");
+            }
+            if (waitResult == 0) {
+                continue;
+            }
+
+            gpiod_line_event event{};
+            if (gpiod_line_event_read(it->second.line, &event) < 0) {
+                throw systemError("gpiod_line_event_read");
+            }
+            return line;
+        }
+    }
+    return std::nullopt;
 }
 
 LinuxSpi::LinuxSpi(const std::string &device, std::uint32_t speed) : fd_(-1), speed_(speed) {
@@ -170,4 +262,3 @@ void LinuxSpi::transfer(std::span<const std::uint8_t> data) {
 #endif
 
 }  // namespace inky
-

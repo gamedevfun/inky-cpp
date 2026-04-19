@@ -2,7 +2,6 @@
 
 #include "inky/hardware.hpp"
 
-#include <array>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -55,9 +54,6 @@ private:
     void writeDisplay(std::span<const std::uint8_t> packedBuffer, bool waitForIdle);
     std::vector<std::uint8_t> packBuffer() const;
 
-    std::vector<std::uint8_t> paletteFromSaturation(float saturation) const;
-    std::uint8_t quantizePixel(const std::array<std::uint8_t, 3> &pixel, std::span<const std::uint8_t> palette) const;
-
     std::shared_ptr<SpiDevice> spi_;
     std::shared_ptr<GpioController> gpio_;
     Pins pins_;
@@ -67,4 +63,3 @@ private:
 };
 
 }  // namespace inky
-

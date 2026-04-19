@@ -1,6 +1,7 @@
 # Inky C++ Port
 
 Modern C++20 port of the Inky driver focused on the E673 Inky Impression 7.3" Spectra 6 display.
+The library now includes lightweight board helpers for the onboard LED and buttons in addition to the display driver.
 
 - [Overview](#overview)
 - [Requirements](#requirements)
@@ -42,6 +43,12 @@ Native debug build:
 ```bash
 cmake --preset native-debug
 cmake --build --preset native-debug
+```
+
+Run tests:
+
+```bash
+ctest --test-dir build --output-on-failure
 ```
 
 Examples are enabled by default. Disable them with:
@@ -109,6 +116,7 @@ ssh pi@<pi-ip> "/home/pi/inky_e673_example"
 ## Usage
 
 ```cpp
+#include "inky/board.hpp"
 #include "inky/e673.hpp"
 #include "inky/hardware.hpp"
 
@@ -116,6 +124,8 @@ int main() {
     auto spi = std::make_shared<inky::LinuxSpi>();
     auto gpio = std::make_shared<inky::LinuxGpio>();
     inky::E673 display(spi, gpio);
+    inky::Board board(gpio);
+    board.setLed(true);
     display.show();
 }
 ```
@@ -123,20 +133,24 @@ int main() {
 Example target built by default:
 
 - `inky_e673_example` from `examples/e673_show.cpp`
+- `inky_board_led_example` from `examples/board_led.cpp`
+- `inky_board_buttons_example` from `examples/board_buttons.cpp`
 - When built without Linux hardware support, the example uses mock GPIO/SPI backends for local validation.
 
 ## Porting Workflow
 
 - Boundaries and rules: `docs/cpp-port-structure.md`
 - Progress tracker: `docs/porting-status.md`
+- AI assistant guidance: `AGENTS.md`
 - Python reference snapshot: `reference/python/README.md`
 - Original upstream-style README (preserved): `reference/python/README_ORIGINAL.md`
 
 ## Repository Layout
 
 - `include/` public C++ headers
-- `src/` C++ driver and hardware implementation
+- `src/` C++ driver, board helpers, and hardware implementation
 - `examples/` C++ examples only
+- `tests/` self-contained C++ test programs
 - `reference/python/` archived Python package, examples, tests, and packaging helpers used only for porting reference
 
 ## Troubleshooting
