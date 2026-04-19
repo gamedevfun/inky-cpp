@@ -1,13 +1,20 @@
 #pragma once
 
 #include <cstdint>
+#include <chrono>
+#include <deque>
+#include <memory>
+#include <optional>
 #include <span>
 #include <string>
 #include <vector>
-#include <memory>
-#include <optional>
 
 namespace inky {
+
+enum class GpioEdge {
+    None,
+    Falling,
+};
 
 /**
  * Simple SPI abstraction that mirrors the byte-wise transfers used by the
@@ -34,13 +41,19 @@ public:
         (void)initialState;
     }
 
-    virtual void configureInput(unsigned int line, bool pullUp) {
+    virtual void configureInput(unsigned int line, bool pullUp, GpioEdge edge = GpioEdge::None) {
         (void)line;
         (void)pullUp;
+        (void)edge;
     }
 
     virtual void setValue(unsigned int line, bool active) = 0;
     virtual bool getValue(unsigned int line) const = 0;
+    virtual std::optional<unsigned int> waitForEdge(std::span<const unsigned int> lines, std::chrono::milliseconds timeout) {
+        (void)lines;
+        (void)timeout;
+        return std::nullopt;
+    }
 };
 
 class NullSpi : public SpiDevice {
@@ -53,13 +66,21 @@ public:
     explicit MemoryGpio(std::size_t lines = 64);
 
     void configureOutput(unsigned int line, bool initialState) override;
-    void configureInput(unsigned int line, bool pullUp) override;
+    void configureInput(unsigned int line, bool pullUp, GpioEdge edge = GpioEdge::None) override;
     void setValue(unsigned int line, bool active) override;
     bool getValue(unsigned int line) const override;
+    std::optional<unsigned int> waitForEdge(std::span<const unsigned int> lines, std::chrono::milliseconds timeout) override;
 
 private:
     void ensureSize(unsigned int line);
+    struct LineConfig {
+        bool isOutput{false};
+        bool pullUp{false};
+        GpioEdge edge{GpioEdge::None};
+    };
     std::vector<bool> states_;
+    std::vector<LineConfig> configs_;
+    std::deque<unsigned int> edgeEvents_;
 };
 
 #ifdef INKY_ENABLE_LINUX_GPIOD
@@ -69,9 +90,10 @@ public:
     ~LinuxGpio() override;
 
     void configureOutput(unsigned int line, bool initialState) override;
-    void configureInput(unsigned int line, bool pullUp) override;
+    void configureInput(unsigned int line, bool pullUp, GpioEdge edge = GpioEdge::None) override;
     void setValue(unsigned int line, bool active) override;
     bool getValue(unsigned int line) const override;
+    std::optional<unsigned int> waitForEdge(std::span<const unsigned int> lines, std::chrono::milliseconds timeout) override;
 
 private:
     struct Impl;
@@ -92,4 +114,3 @@ private:
 #endif
 
 }  // namespace inky
-
