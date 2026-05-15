@@ -27,6 +27,7 @@ Use this file to track what has been ported from Python and what still needs ver
 | Linux SPI transfer behavior | `reference/python/driver/inky/inky.py` | `src/hardware.cpp` | ported | partial | Validate chunking/transfer options under load. |
 | Spectra 6 LED example | `reference/python/examples/spectra6/led.py` | `examples/board_led.cpp`, `src/board.cpp` | ported | covered | Board helper wraps the LED pin behind the GPIO abstraction. |
 | Spectra 6 button example | `reference/python/examples/spectra6/buttons.py` | `examples/board_buttons.cpp`, `src/board.cpp` | ported | covered | Falling-edge wait path covered by `MemoryGpio` tests; Linux runtime validation still needed. |
+| Spectra 6 image example | `reference/python/examples/spectra6/image.py` | `examples/e673_image.cpp`, `examples/image_loader.cpp` | ported | covered | Example-only image loading uses vendored `stb_image` plus an approximate local bicubic RGB resize helper; quantization parity is covered by C++ tests, while resize parity is checked against a bounded Pillow-reference tolerance. |
 | Example parity behavior | `reference/python/examples/spectra6/*.py` | `examples/e673_show.cpp`, `examples/board_*.cpp` | ported | n/a | C++ examples now cover display, LED, and button flows. |
 
 ## Exit Criteria (Remove Python Reference)

@@ -13,6 +13,11 @@ inline constexpr std::array<std::uint8_t, 6> kPaletteRemap = {0, 1, 2, 3, 5, 6};
 
 std::array<std::uint8_t, 18> paletteFromSaturation(float saturation);
 std::uint8_t quantizePixel(const std::array<std::uint8_t, 3> &pixel, std::span<const std::uint8_t> paletteBytes);
+std::vector<std::uint8_t> quantizeImageRgb(
+    std::span<const std::uint8_t> rgbPixels,
+    std::size_t width,
+    std::size_t height,
+    std::span<const std::uint8_t> paletteBytes);
 bool isValidNativeIndex(std::uint8_t index);
 std::vector<std::uint8_t> packNativeIndices(std::span<const std::uint8_t> indices);
 

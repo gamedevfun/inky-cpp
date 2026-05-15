@@ -58,6 +58,15 @@ if(INKY_BUILD_EXAMPLES)
 
     add_executable(inky_board_buttons_example examples/board_buttons.cpp)
     target_link_libraries(inky_board_buttons_example PRIVATE inky)
+
+    add_executable(inky_e673_image_example
+        examples/e673_image.cpp
+        examples/image_loader.cpp
+    )
+    target_include_directories(inky_e673_image_example PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/examples
+    )
+    target_link_libraries(inky_e673_image_example PRIVATE inky)
 endif()
 
 if(INKY_BUILD_TESTS)
@@ -66,10 +75,13 @@ if(INKY_BUILD_TESTS)
         tests/test_main.cpp
         tests/test_board.cpp
         tests/test_e673.cpp
+        tests/test_image_loader.cpp
         tests/test_palette.cpp
+        examples/image_loader.cpp
     )
     target_include_directories(inky_tests PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/examples
         ${CMAKE_CURRENT_SOURCE_DIR}/src
     )
     target_link_libraries(inky_tests PRIVATE inky)
@@ -95,4 +107,9 @@ if(INKY_BUILD_EXAMPLES)
         inky_board_buttons_example
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
     )
+    if(TARGET inky_e673_image_example)
+        install(TARGETS inky_e673_image_example
+            RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+        )
+    endif()
 endif()
