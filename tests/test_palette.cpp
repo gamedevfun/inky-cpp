@@ -50,6 +50,44 @@ INKY_TEST(quantize_prefers_nearest_colour) {
     INKY_ASSERT_EQ(inky::palette::quantizePixel({150, 80, 78}, palette), 3);
 }
 
+INKY_TEST(quantize_image_matches_python_reference_case_one) {
+    const auto palette = inky::palette::paletteFromSaturation(0.5f);
+    const std::vector<std::uint8_t> rgb = {
+        255, 0, 0, 220, 40, 40, 180, 70, 70, 140, 90, 90,
+        0, 255, 0, 20, 220, 40, 60, 180, 60, 100, 140, 80,
+        0, 0, 255, 40, 40, 220, 70, 70, 180, 90, 90, 140,
+        255, 255, 0, 220, 220, 40, 180, 180, 70, 140, 140, 90,
+    };
+    const std::vector<std::uint8_t> expected = {
+        3, 3, 3, 3,
+        6, 6, 6, 6,
+        5, 5, 5, 1,
+        2, 2, 2, 5,
+    };
+
+    const auto quantized = inky::palette::quantizeImageRgb(rgb, 4, 4, palette);
+    INKY_ASSERT_EQ(quantized, expected);
+}
+
+INKY_TEST(quantize_image_matches_python_reference_case_two) {
+    const auto palette = inky::palette::paletteFromSaturation(0.5f);
+    const std::vector<std::uint8_t> rgb = {
+        10, 10, 10, 120, 120, 120, 240, 240, 240, 250, 240, 20,
+        250, 20, 20, 40, 40, 180, 40, 150, 60, 150, 120, 70,
+        20, 20, 240, 220, 220, 120, 170, 80, 85, 90, 110, 150,
+        5, 250, 5, 200, 200, 200, 100, 60, 60, 60, 100, 60,
+    };
+    const std::vector<std::uint8_t> expected = {
+        0, 6, 1, 2,
+        3, 5, 6, 3,
+        5, 1, 3, 1,
+        6, 1, 6, 5,
+    };
+
+    const auto quantized = inky::palette::quantizeImageRgb(rgb, 4, 4, palette);
+    INKY_ASSERT_EQ(quantized, expected);
+}
+
 INKY_TEST(native_index_validation_and_packing) {
     INKY_ASSERT(inky::palette::isValidNativeIndex(0));
     INKY_ASSERT(inky::palette::isValidNativeIndex(6));

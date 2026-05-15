@@ -67,15 +67,7 @@ void E673::setImageRgb(std::span<const std::uint8_t> rgbPixels, float saturation
         throw std::invalid_argument("RGB payload must contain 800x480 pixels with three bytes each");
     }
     const auto paletteBytes = palette::paletteFromSaturation(saturation);
-
-    for (std::size_t i = 0; i < buffer_.size(); ++i) {
-        std::array<std::uint8_t, 3> pixel{
-            rgbPixels[i * 3 + 0],
-            rgbPixels[i * 3 + 1],
-            rgbPixels[i * 3 + 2],
-        };
-        buffer_[i] = palette::quantizePixel(pixel, paletteBytes);
-    }
+    buffer_ = palette::quantizeImageRgb(rgbPixels, Width, Height, paletteBytes);
 }
 
 void E673::show(bool busyWait) {
