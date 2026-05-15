@@ -7,8 +7,8 @@ on:
       - main
 
 jobs:
-  example-smoke-test:
-    name: Example smoke test
+  build-and-test:
+    name: Build and test
     runs-on: ubuntu-latest
 
     steps:
@@ -27,6 +27,10 @@ jobs:
       - name: Build
         run: |
           cmake --build build
+
+      - name: Run tests
+        run: |
+          ctest --test-dir build --output-on-failure
 
       - name: Run example
         run: |

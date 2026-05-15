@@ -172,3 +172,10 @@ Example target built by default:
 
 - Host compiler is newer than Pi runtime.
 - Use a compiler matching target distro (aarch64 preset is pinned to GCC 12) or build on Pi.
+
+`GLIBC_2.xx not found` on Raspberry Pi
+
+- The binary was linked against a newer target userspace than the Pi is running.
+- If you cross-compile, refresh `.sysroot` from the exact Pi you will run on, then rebuild with `rpi-aarch64-release` or `rpi-armhf-release`.
+- If you built the binary with `native-debug` or another host build, do not copy that binary to the Pi; build on the Pi itself or use the Raspberry Pi cross preset.
+- Verify the Pi runtime with `ldd --version` and compare it to the required version reported by the loader error.
